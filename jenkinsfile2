@@ -1,37 +1,54 @@
 pipeline {
-environment {
-registry = "ahmed464/repo1"
-registryCredential = 'dockerhub_id'
-dockerImage = ''
-}
-agent any
-stages {
-stage('Cloning our Git') {
-steps {
-git 'https://github.com/devops-ing/docker-imagies.git'
-}
-}
-stage('Building our image') {
-steps{
-script {
-dockerImage = docker.build registry + ":$BUILD_NUMBER"
-}
-}
-}
-stage('Deploy our image') {
-steps{
-script {
-docker.withRegistry( '', registryCredential ) {
-dockerImage.push()
-}
-}
-}
-}
-stage('Cleaning up') {
-steps{
-sh "docker rmi $registry:$BUILD_NUMBER"
-}
-}
-}
+    agent {
+        label 'UbuntuNode1'
+    }
+    environment {
+    registry = "ahmed464/repo1"
+    registryCredential = 'dockerhub_id'
+    dockerImage = ''
+    }
+    parameters {
+        string(name: 'RAISON', defaultValue: 'change', description: '')
+        choice(name: 'DEPLOY_ENV', choices: ['dev', 'int', 'rec', 'pprod', 'prod'], description: '')
+    }
+    stages {
+        stage('Display parameters before execute pipeline') {
+            steps {
+                echo "The raison of deployment is : ${params.RAISON}"
+                echo "The env to deploy is : ${params.DEPLOY_ENV}"
+            }
+        }
+        stage('Cloning our Git') {
+            steps {
+                git branch: 'main', credentialsId: 'personalgithubtoken_id', url: 'https://github.com/devops-ing/docker-imagies.git'
+            }
+        }
+        stage('Building our image') {
+            steps{
+                script {
+                    dockerImage = docker.build registry + ":$BUILD_NUMBER"
+                }
+            }
+        }
+        stage('Deploy our image') {
+            when {
+                expression { 
+                    return params.DEPLOY_ENV == 'prod' 
+                }                
+            }
+            steps{
+                script {
+                    docker.withRegistry( '', registryCredential ) {
+                    dockerImage.push()
+                    }
+                }
+            }
+        }
+        stage('Cleaning up') {
+            steps{
+                sh "docker rmi $registry:$BUILD_NUMBER"
+            }
+        }
+    }
 }
 Run y
